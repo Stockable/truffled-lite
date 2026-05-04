@@ -13,6 +13,13 @@
 
     <style>
         /* SITE UI STYLES */
+        #ui-header {
+            position: relative;
+            max-width: 600px;
+            margin: 0 auto;
+            text-align: center;
+        }
+
         #game-view {
             width: 100%;
             max-width: 1000px;
@@ -31,12 +38,57 @@
             display: block;
         }
 
-        /* Fullscreen fix: ensures iframe takes up the whole screen when active */
         #game-wrapper:fullscreen {
             width: 100vw;
             height: 100vh;
         }
 
+        /* SEARCH & RECOMMENDATIONS */
+        .search-container {
+            position: relative;
+            width: 100%;
+        }
+
+        #searchResults {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: #1a2525;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-top: none;
+            border-radius: 0 0 12px 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            z-index: 1000;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.4);
+        }
+
+        .search-item {
+            display: flex;
+            align-items: center;
+            padding: 10px 15px;
+            cursor: pointer;
+            transition: background 0.2s;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            text-align: left;
+            color: white;
+            font-family: 'Poppins', sans-serif;
+        }
+
+        .search-item:hover {
+            background: rgba(255,255,255,0.1);
+        }
+
+        .search-item img {
+            width: 40px;
+            height: 40px;
+            border-radius: 6px;
+            margin-right: 15px;
+            object-fit: cover;
+        }
+
+        /* ICONS & GALLERY */
         #game-controls.iframeiconshere {
             display: flex;
             justify-content: flex-start;
@@ -60,10 +112,7 @@
             transform: translateY(-2px);
         }
 
-        #game-controls.iframeiconshere svg {
-            width: 20px;
-            height: 20px;
-        }
+        #game-controls.iframeiconshere svg { width: 20px; height: 20px; }
 
         #searchCount {
             color: #ffffff;
@@ -73,7 +122,6 @@
             margin-bottom: 10px;
         }
 
-        /* GALLERY GRID */
         .game-gallery {
             display: grid;
             grid-template-columns: repeat(6, 1fr); 
@@ -123,16 +171,9 @@
             z-index: 2;
         }
 
-        .game:hover .game-link::after {
-            opacity: 1;
-        }
+        .game:hover .game-link::after { opacity: 1; }
 
-        .game-thumbnail {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            display: block;
-        }
+        .game-thumbnail { width: 100%; height: 100%; object-fit: cover; display: block; }
 
         .hidden { display: none !important; }
 
@@ -147,7 +188,10 @@
         <div id="ui-header">
             <h4>Truffled Lite</h4>
             <div id="searchCount">Scanning games...</div>
-            <input type="text" id="searchInput" class="search-bar" placeholder="Search games..." autocomplete="off">
+            <div class="search-container">
+                <input type="text" id="searchInput" class="search-bar" placeholder="Search games..." autocomplete="off">
+                <div id="searchResults" class="hidden"></div>
+            </div>
         </div>
         
         <div class="container" id="gallery-container">
@@ -193,12 +237,12 @@
             if (html) {
                 document.getElementById('gallery-container').classList.add('hidden');
                 document.getElementById('ui-header').classList.add('hidden');
+                document.getElementById('searchResults').classList.add('hidden');
                 gameView.classList.remove('hidden');
                 iframe.srcdoc = html;
             }
         }
 
-        // Updated for strict iframe fullscreen
         document.getElementById('fullscreen-btn').onclick = () => {
             const iframe = document.getElementById('game-wrapper');
             if (iframe.requestFullscreen) iframe.requestFullscreen();
@@ -251,17 +295,51 @@
             setupSearch(games) {
                 const input = document.getElementById('searchInput');
                 const countText = document.getElementById('searchCount');
+                const resultsDropdown = document.getElementById('searchResults');
 
                 input.oninput = () => {
                     const val = input.value.toLowerCase();
                     let count = 0;
+                    resultsDropdown.innerHTML = '';
+
+                    if (val.length > 0) {
+                        resultsDropdown.classList.remove('hidden');
+                        const filtered = games.filter(g => g.name.toLowerCase().includes(val));
+                        
+                        filtered.forEach(g => {
+                            const item = document.createElement('div');
+                            item.className = 'search-item';
+                            item.innerHTML = `
+                                <img src="${g.thumbnail}" onerror="this.src='https://placehold.co/50?text=?'">
+                                <span>${g.name}</span>
+                            `;
+                            item.onclick = () => loadGameFromUrl(g.url);
+                            resultsDropdown.appendChild(item);
+                            count++;
+                        });
+
+                        if (count === 0) {
+                            resultsDropdown.innerHTML = '<div class="search-item">No results found</div>';
+                        }
+                    } else {
+                        resultsDropdown.classList.add('hidden');
+                    }
+
+                    // also filter the main gallery grid
                     document.querySelectorAll('.game').forEach(item => {
                         const match = item.getAttribute('data-name').toLowerCase().includes(val);
                         item.style.display = match ? 'block' : 'none';
-                        if (match) count++;
                     });
-                    countText.textContent = val ? `Found ${count} matches` : `Showing all ${games.length} games`;
+
+                    countText.textContent = val ? `Found ${count} matches in ${games.length} games` : `Showing all ${games.length} games`;
                 };
+
+                // close dropdown if clicking outside
+                document.addEventListener('click', (e) => {
+                    if (!input.contains(e.target) && !resultsDropdown.contains(e.target)) {
+                        resultsDropdown.classList.add('hidden');
+                    }
+                });
             }
         }
 
